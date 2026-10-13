@@ -1,3 +1,6 @@
+// Version shown on the Data Status page, so you can check the new file is live
+const APP_VERSION = "v4 – Colors";
+
 const STORAGE_KEY = "theDealInventoryV1";
 const META_KEY = "theDealInventoryMetaV1";
 
@@ -546,6 +549,7 @@ function renderStatus(){
     <div class="status-item"><small>Rows / SKUs</small><strong>${inventory.length.toLocaleString()}</strong></div>
     <div class="status-item"><small>Total Closing SOH</small><strong>${totalSoh.toLocaleString()}</strong></div>
     <div class="status-item"><small>Total Retail Stock Value</small><strong>${money(totalValue)}</strong></div>
+    <div class="status-item"><small>App Version</small><strong>${APP_VERSION}</strong></div>
     <div class="status-item"><small>File</small><strong style="font-size:13px;word-break:break-word">${esc(meta.filename||"—")}</strong></div>`;
 }
 
