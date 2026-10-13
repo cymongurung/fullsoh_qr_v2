@@ -298,7 +298,15 @@ function showRelated(product){
 }
 
 // ---------- Colors: same style, different colour (VPN = STYLE-COLOR) ----------
-function vpnStyle(v){ const s = clean(v); const i = s.lastIndexOf("-"); return i > 0 ? s.slice(0,i) : ""; }
+function vpnStyle(v){
+  const s = clean(v); const i = s.indexOf("-");
+  if(i <= 0) return "";
+  // Normally the style is the first part (e.g. S0940651 in S0940651-861-JADE).
+  // Very short first parts are too generic, so use everything before the last dash instead.
+  if(i >= 5) return s.slice(0,i);
+  const j = s.lastIndexOf("-");
+  return s.slice(0,j);
+}
 function vpnColor(v){ const s = clean(v); const i = s.lastIndexOf("-"); return i > 0 ? s.slice(i+1) : ""; }
 
 function colorGroups(product){
@@ -306,14 +314,19 @@ function colorGroups(product){
   if(!style) return [];
   const map = new Map();
   inventory.forEach(x => {
-    if(vpnStyle(x.vpn) !== style) return;
+    if(x.brand !== product.brand || vpnStyle(x.vpn) !== style) return;
     const g = map.get(x.vpn) || {vpn:x.vpn, color:vpnColor(x.vpn), soh:0, sizes:0};
     g.soh += Number(String(x.closingSoh).replace(/,/g,"")) || 0;
     g.sizes++;
     map.set(x.vpn, g);
   });
+  const list = [...map.values()];
+  // if two colours end with the same code, show the longer part of the VPN so they can be told apart
+  const count = {};
+  list.forEach(g => count[g.color] = (count[g.color]||0) + 1);
+  list.forEach(g => { if(count[g.color] > 1) g.color = g.vpn.slice(style.length + 1); });
   // this item's colour first, then in-stock colours, then the rest
-  return [...map.values()].sort((a,b) =>
+  return list.sort((a,b) =>
     (b.vpn===product.vpn) - (a.vpn===product.vpn) ||
     (b.soh>0) - (a.soh>0) ||
     a.color.localeCompare(b.color));
