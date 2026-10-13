@@ -27,6 +27,14 @@ function qty(v){
   return Number.isFinite(n) ? n.toLocaleString("en-AE") : clean(v) || "0";
 }
 
+// ---------- Link to The Deal website ----------
+// If the site's search address is different, change only this line.
+const DEAL_SEARCH_URL = "https://www.thedealoutlet.com/ae-en/search?q=";
+
+function dealSearchLink(itemId){
+  return DEAL_SEARCH_URL + encodeURIComponent(clean(itemId));
+}
+
 const DB_NAME = "TheDealStockScannerDB";
 const DB_VERSION = 1;
 const STORE_NAME = "inventory";
@@ -246,7 +254,11 @@ function showProduct(product){
         <div class="metric"><label>VPN</label><strong>${esc(product.vpn || "—")}</strong></div>
       </div>
       <div class="details">
-        <div class="detail-row"><span>Product ID</span><strong>${esc(product.productId)}</strong></div>
+        <div class="detail-row"><span>Product ID</span><strong>${
+          product.productId
+            ? `<a class="deal-link" href="${esc(dealSearchLink(product.productId))}" target="_blank" rel="noopener">${esc(product.productId)} ↗</a>`
+            : "—"
+        }</strong></div>
         <div class="detail-row"><span>Barcode</span><strong>${esc(product.barcode)}</strong></div>
         <div class="detail-row"><span>Supplier / Consignment Item</span><strong>${esc(isSupplier)}</strong></div>
         <div class="detail-row"><span>Description</span><strong>${esc(product.description)}</strong></div>
@@ -255,17 +267,18 @@ function showProduct(product){
       </div>
       <div class="actions">
         <button class="primary" id="relatedYes" ${related.length <= 1 ? "disabled":""}>YES — Related Items (${Math.max(related.length-1,0)})</button>
+        <button class="primary" id="colorsBtn" ${colorGroups(product).length <= 1 ? "disabled":""}>COLORS (${colorGroups(product).length})</button>
         <button class="secondary" id="clearResult">NO / Next Scan</button>
       </div>
       <div class="related" id="relatedArea"></div>
     </div>`;
   $("relatedYes").addEventListener("click",()=>showRelated(product));
+  $("colorsBtn").addEventListener("click",()=>showColors(product));
   $("clearResult").addEventListener("click",()=>clearResult());
 }
 
-function showRelated(product){
-  const related = inventory.filter(x => x.vpn && x.vpn === product.vpn);
-  const rows = related.map(x => `
+function itemsTable(list){
+  const rows = list.map(x => `
     <tr>
       <td>${esc(x.productId)}</td>
       <td>${esc(x.barcode)}</td>
@@ -273,12 +286,66 @@ function showRelated(product){
       <td>${money(x.retailPrice)}</td>
       <td class="soh ${Number(x.closingSoh)===0?'zero':'positive'}">${qty(x.closingSoh)}</td>
     </tr>`).join("");
-  $("relatedArea").innerHTML = `
-    <h3>Related Items — Same VPN</h3>
-    <div class="table-wrap"><table>
+  return `<div class="table-wrap"><table>
       <thead><tr><th>Product ID</th><th>Barcode</th><th>Product Description</th><th>Retail Price</th><th>Daily Closing SOH</th></tr></thead>
       <tbody>${rows || "<tr><td colspan='5'>No related items found.</td></tr>"}</tbody>
     </table></div>`;
+}
+
+function showRelated(product){
+  const related = inventory.filter(x => x.vpn && x.vpn === product.vpn);
+  $("relatedArea").innerHTML = `<h3>Related Items — Same VPN</h3>` + itemsTable(related);
+}
+
+// ---------- Colors: same style, different colour (VPN = STYLE-COLOR) ----------
+function vpnStyle(v){ const s = clean(v); const i = s.lastIndexOf("-"); return i > 0 ? s.slice(0,i) : ""; }
+function vpnColor(v){ const s = clean(v); const i = s.lastIndexOf("-"); return i > 0 ? s.slice(i+1) : ""; }
+
+function colorGroups(product){
+  const style = vpnStyle(product.vpn);
+  if(!style) return [];
+  const map = new Map();
+  inventory.forEach(x => {
+    if(vpnStyle(x.vpn) !== style) return;
+    const g = map.get(x.vpn) || {vpn:x.vpn, color:vpnColor(x.vpn), soh:0, sizes:0};
+    g.soh += Number(String(x.closingSoh).replace(/,/g,"")) || 0;
+    g.sizes++;
+    map.set(x.vpn, g);
+  });
+  // this item's colour first, then in-stock colours, then the rest
+  return [...map.values()].sort((a,b) =>
+    (b.vpn===product.vpn) - (a.vpn===product.vpn) ||
+    (b.soh>0) - (a.soh>0) ||
+    a.color.localeCompare(b.color));
+}
+
+function showColors(product){
+  const groups = colorGroups(product);
+  $("relatedArea").innerHTML = `
+    <h3>Colors — Style ${esc(vpnStyle(product.vpn))}</h3>
+    <div class="kw-list" style="padding:0">${groups.map((g,i)=>`
+      <button class="kw-item" data-i="${i}">
+        <span class="kw-main">
+          <strong>${esc(g.color)}</strong>
+          <small class="${g.vpn===product.vpn?'this':''}">${g.vpn===product.vpn?"This item's color • ":""}${esc(g.vpn)}</small>
+        </span>
+        <span class="kw-side">
+          <strong>SOH ${qty(g.soh)}</strong>
+          <small>${g.sizes} size${g.sizes===1?"":"s"}</small>
+        </span>
+      </button>`).join("")}</div>`;
+  document.querySelectorAll("#relatedArea .kw-item").forEach(b =>
+    b.addEventListener("click", () => showColorItems(product, groups[Number(b.dataset.i)])));
+  $("relatedArea").scrollIntoView({behavior:"smooth", block:"start"});
+}
+
+function showColorItems(product, g){
+  const list = inventory.filter(x => x.vpn === g.vpn);
+  $("relatedArea").innerHTML = `
+    <button class="secondary" id="colorsBack" style="margin:0 0 12px">← Back to colors</button>
+    <h3>Color ${esc(g.color)} — ${esc(g.vpn)}</h3>` + itemsTable(list);
+  $("colorsBack").addEventListener("click", () => showColors(product));
+  $("relatedArea").scrollIntoView({behavior:"smooth", block:"start"});
 }
 
 function search(){

@@ -98,3 +98,10 @@ table{width:100%;border-collapse:collapse;min-width:720px;background:#fff}th,td{
 .qr-preview{margin-top:22px;text-align:center}
 .qr-preview img{width:240px;max-width:100%;background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px}
 .qr-preview .hint{margin:10px 0 16px;word-break:break-word}
+
+/* Product ID link to website */
+.deal-link{color:#1d4ed8;text-decoration:underline;text-underline-offset:3px}
+.deal-link:active{color:#1e3a8a}
+
+/* Colors option */
+.color-item small.this{color:var(--green);font-weight:700}
